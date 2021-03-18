@@ -1,0 +1,72 @@
+/* Query 1 - query used for first insight */
+SELECT DATE_PART('year', r.rental_date) AS rental_year
+      ,DATE_PART('month', r.rental_date) AS rental_mon
+      ,so.store_id, COUNT(*) as count_rentals
+  FROM rental r
+  JOIN staff sa
+    ON r.staff_id = sa.staff_id
+  JOIN store so
+    ON sa.store_id = so.store_id
+ GROUP BY year, mon, so.store_id
+ ORDER BY count_rentals DESC
+
+
+ /* Query 2 - query used for second insight */
+ SELECT DATE_TRUNC('month', p.payment_date) pay_mon
+      ,t.fullname as fullname
+      ,COUNT(p.*) AS pay_countpermonth
+      ,SUM(p.amount) AS pay_amount
+  FROM payment p
+  JOIN (
+  	SELECT p.customer_id
+  	      ,CONCAT(c.first_name, ' ', c.last_name) AS fullname
+  	      ,SUM(p.amount) AS pay_amount
+  	  FROM payment p
+      JOIN customer c
+        ON c.customer_id = p.customer_id
+     GROUP BY p.customer_id, fullname
+     ORDER BY pay_amount DESC
+     LIMIT 10
+  ) t
+    ON p.customer_id = t.customer_id
+ GROUP BY pay_mon, fullname
+ ORDER BY fullname ASC
+
+
+ /* Query 3 - query used for third insight */
+ SELECT p.customer_id
+      ,TO_CHAR(p.payment_date, 'MM') AS mon
+      ,t.fullname, SUM(p.amount) AS monthly_amount
+      ,SUM(p.amount) - LAG(SUM(p.amount)) OVER (PARTITION BY p.customer_id ORDER BY 2) AS diff
+  FROM payment p
+ RIGHT JOIN (
+ 	SELECT p.customer_id
+          ,CONCAT(c.first_name, ' ', c.last_name) AS fullname
+          ,SUM(p.amount) AS pay_amount
+  	  FROM payment p
+  	  JOIN customer c
+  		ON c.customer_id = p.customer_id
+  	 GROUP BY p.customer_id, fullname
+  	 ORDER BY pay_amount DESC
+  	 LIMIT 10
+	) t
+	ON p.customer_id = t.customer_id
+ WHERE DATE_PART('year', p.payment_date) = 2007
+ GROUP BY 1,2,3
+ ORDER BY 1,2
+
+
+ /* Query 4 - query used for fourth insight */
+SELECT c.name AS category
+      ,DATE_TRUNC('month', r.rental_date) AS mon
+      ,COUNT(c.category_id) AS rents_by_month
+  FROM category c
+  JOIN film_category fc
+    ON c.category_id = fc.category_id
+  JOIN film f
+    ON fc.film_id = f.film_id
+  JOIN inventory i
+    ON f.film_id = i.film_id
+  JOIN rental r
+    ON i.inventory_id = r.inventory_id
+ GROUP BY 1,2
